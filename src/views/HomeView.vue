@@ -420,7 +420,6 @@ onUnmounted(() => {
           <el-option label="自定义词汇" value="custom"></el-option>
         </el-select>
         <el-link :underline="false" @click="router.push('/search')">模糊搜索</el-link>
-        <el-link :underline="false" @click="router.push('/profile')">个人中心</el-link>
       </span>
       <span class="header-right">
         <span class="steps">{{state.current}} / {{state.list.length}}</span>
@@ -436,7 +435,18 @@ onUnmounted(() => {
           active-value="1"
           inactive-value="0"
         />
-        <el-button class="help-button" @click="showHelpModal = true">使用帮助</el-button>
+        <button
+          class="help-icon-button"
+          type="button"
+          title="使用帮助"
+          aria-label="使用帮助"
+          @click="showHelpModal = true"
+        >
+          ?
+        </button>
+        <el-link class="profile-link" :underline="false" @click="router.push('/profile')">
+          个人中心
+        </el-link>
       </span>
     </div>
     <message v-show="state.msg.text" :text="state.msg.text" :type="state.msg.type"/>
@@ -611,13 +621,34 @@ onUnmounted(() => {
             background: transparent;
           }
         }
-        .help-button{
-          color: #444;
+        .help-icon-button{
+          width: 28px;
+          height: 28px;
+          padding: 0;
+          margin-left: 8px;
+          border: 1px solid #777;
+          border-radius: 50%;
           background: transparent;
-          border: none;
+          color: #b9b9b9;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 15px;
+          font-weight: 700;
+          line-height: 1;
+          cursor: pointer;
           &:hover{
-            color: #999;
-            background: transparent;
+            color: #fff;
+            border-color: #bbb;
+            background: rgba(255, 255, 255, 0.08);
+          }
+        }
+        .profile-link{
+          margin-left: 10px;
+          color: #b9b9b9;
+          font-size: 13px;
+          &:hover{
+            color: #fff;
           }
         }
         .review-type{
@@ -773,6 +804,16 @@ onUnmounted(() => {
         }
         .review-type{
           margin: 0 6px;
+        }
+        .help-icon-button{
+          width: 26px;
+          height: 26px;
+          margin-left: 4px;
+          font-size: 14px;
+        }
+        .profile-link{
+          margin-left: 6px;
+          font-size: 12px;
         }
       }
     }
