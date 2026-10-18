@@ -757,6 +757,25 @@ onUnmounted(() => {
     padding-top: 66px;
   }
   @media screen and (max-width: 600px) {
+    .header {
+      padding: 6px 8px;
+      .header-left .el-link{
+        margin-right: 6px;
+        font-size: 12px;
+      }
+      .header-right{
+        .steps{
+          display: none;
+        }
+        .hard-button{
+          margin-right: 2px;
+          font-size: 12px;
+        }
+        .review-type{
+          margin: 0 6px;
+        }
+      }
+    }
     .playground {
       height: 24vh;
       letter-spacing: 4px;

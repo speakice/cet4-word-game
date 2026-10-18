@@ -170,7 +170,7 @@ onMounted(() => {
       <header class="profile-header">
         <div>
           <h1>个人中心</h1>
-          <p>学习记录保存在本机浏览器里，换设备不会同步。</p>
+          <p>学习记录保存在本机浏览器里；学习时长从本版本开始记录，已学词汇会兼容历史进度。</p>
         </div>
         <el-button class="back-button" @click="router.push('/')">返回练习</el-button>
       </header>
