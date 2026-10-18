@@ -106,14 +106,15 @@ export function bootstrapProgressFromLegacy(words: string[]): void {
   }
 
   const progress: Record<string, WordProgress> = {};
-  const now = Date.now();
+  // 放在 30 天窗口外，避免历史占位词把“最近一月”考试池撑满
+  const legacyTime = Date.now() - 31 * 24 * 60 * 60 * 1000;
   for (let index = 0; index < maxIndex; index += 1) {
     const word = words[index]?.split(' ')[0];
     if (word) {
       progress[word] = {
         learned: true,
-        learnedAt: now,
-        lastPracticedAt: now,
+        learnedAt: legacyTime,
+        lastPracticedAt: legacyTime,
         practiceCount: 1,
         correctCount: 0,
         wrongCount: 0,
