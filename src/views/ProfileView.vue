@@ -5,6 +5,7 @@ import allWords from '@/utils/words';
 import StudyHeatmap from '@/components/StudyHeatmap.vue';
 import { getCachedMeaning } from '@/utils/dictionary';
 import {
+  bootstrapProgressFromLegacy,
   formatDuration,
   getAllWordProgress,
   getDailyStudy,
@@ -157,7 +158,10 @@ function questionTypeLabel(type: string): string {
   return '看词选意';
 }
 
-onMounted(refresh);
+onMounted(() => {
+  bootstrapProgressFromLegacy(allWordList.value);
+  refresh();
+});
 </script>
 
 <template>

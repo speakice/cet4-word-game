@@ -89,6 +89,41 @@ export function getAllWordProgress(): Record<string, WordProgress> {
   return readJson<Record<string, WordProgress>>(PROGRESS_KEY, {});
 }
 
+/**
+ * 老版本只保存了 current_index / max_index，没有逐词进度。
+ * 首次打开个人中心时，用历史最大位置近似初始化已学词汇。
+ */
+export function bootstrapProgressFromLegacy(words: string[]): void {
+  if (localStorage.getItem(PROGRESS_KEY)) {
+    return;
+  }
+  const maxIndex = Math.min(
+    Math.max(0, Number(localStorage.getItem('max_index') || 0)),
+    words.length,
+  );
+  if (maxIndex <= 0) {
+    return;
+  }
+
+  const progress: Record<string, WordProgress> = {};
+  const now = Date.now();
+  for (let index = 0; index < maxIndex; index += 1) {
+    const word = words[index]?.split(' ')[0];
+    if (word) {
+      progress[word] = {
+        learned: true,
+        learnedAt: now,
+        lastPracticedAt: now,
+        practiceCount: 1,
+        correctCount: 0,
+        wrongCount: 0,
+        hard: false,
+      };
+    }
+  }
+  writeJson(PROGRESS_KEY, progress);
+}
+
 export function getWordProgress(word: string): WordProgress {
   const all = getAllWordProgress();
   return (
