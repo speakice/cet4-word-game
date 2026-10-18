@@ -1,3 +1,11 @@
+> **仓库迁移说明**
+>
+> 由于原仓库账号已无法继续维护，本项目已迁移至 [speakice/cet4-word-game](https://github.com/speakice/cet4-word-game)。
+>
+> 新的在线地址：[https://speakice.github.io/cet4-word-game/](https://speakice.github.io/cet4-word-game/)
+>
+> 原仓库仅保留历史代码，后续更新以新仓库为准。
+
 # 在电脑上记单词，一边练盲打，一边背单词
 
 ## 快捷键
