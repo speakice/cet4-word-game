@@ -14,6 +14,16 @@ const router = createRouter({
       name: '搜索',
       component: () => import('../views/SearchView.vue')
     },
+    {
+      path: '/profile',
+      name: '个人中心',
+      component: () => import('../views/ProfileView.vue')
+    },
+    {
+      path: '/exam',
+      name: '考试',
+      component: () => import('../views/ExamView.vue')
+    },
     // {
     //   path: '/test',
     //   name: 'test',

@@ -11,6 +11,13 @@ import Message from '@/components/IMessage.vue'
 import HelpModal from '@/components/HelpModal.vue'
 
 import audioManager from '@/utils/audio';
+import {
+  addStudySeconds,
+  getWordProgress,
+  markWordCompleted,
+  markWordMistake,
+  toggleHardWord,
+} from '@/utils/study';
 
 
 const router = useRouter();
@@ -18,6 +25,10 @@ const route = useRoute();
 
 const skillInputRef = ref<any>(null);
 const showHelpModal = ref(false);
+const isHard = ref(false);
+const wrongMarked = new Set<string>();
+let studyStart = 0;
+let studyTimer: number | undefined;
 
 const handleSkillEnter=()=>{
   state.skillFocus = false
@@ -79,6 +90,36 @@ const upcomingWords = computed(()=>{
   }
   return Array.from(new Set(words.filter(Boolean)))
 })
+
+const refreshHard = () => {
+  isHard.value = currentWord.value
+    ? Boolean(getWordProgress(currentWord.value).hard)
+    : false
+}
+
+const toggleHard = () => {
+  if (!currentWord.value) return
+  isHard.value = toggleHardWord(currentWord.value)
+}
+
+const flushStudyTime = () => {
+  if (!studyStart) return
+  const now = Date.now()
+  const seconds = Math.floor((now - studyStart) / 1000)
+  if (seconds > 0) {
+    addStudySeconds(seconds)
+  }
+  studyStart = now
+}
+
+const handleStudyVisibility = () => {
+  if (document.visibilityState === 'hidden') {
+    flushStudyTime()
+    studyStart = 0
+  } else if (document.visibilityState === 'visible') {
+    studyStart = Date.now()
+  }
+}
 
 const currentSkill = computed({
         get() {
@@ -201,15 +242,24 @@ const handleKeyPress = (event:any) => {
     //   }
     // });
     audioManager.playLetter(event.key.toLowerCase());
-    if(state.audioIndex > (currentWord.value.length-1)*2){
+    const word = currentWord.value
+    if(state.audioIndex > (word.length-1)*2){
       state.audioIndex = 0
     }else{
       state.audioIndex++;
+    }
+    if(word && state.audioIndex % word.length === 0){
+      markWordCompleted(word)
     }
   }else if(isLetter(event)){
     const errorChar = currentWord.value[state.audioIndex % currentWord.value.length];
     if(errorChar){
       showErrorMessage('请输入：' + currentWord.value[state.audioIndex % currentWord.value.length])
+    }
+    const word = currentWord.value
+    if(word && !wrongMarked.has(word)){
+      wrongMarked.add(word)
+      markWordMistake(word)
     }
     audioManager.playErrorSound();
   }
@@ -254,6 +304,8 @@ watch(()=>state.current, (val:number)=>{
 
 watch(currentWord, (newWord: string)=>{
   if(!newWord) return;
+  wrongMarked.clear();
+  refreshHard();
   state.audioIndex = state.reviewType * newWord.length;
   audioManager.preloadAllOnlineAudios([newWord, state.explain[currentWord.value]?.mean_en, state.explain[currentWord.value]?.sentence].filter(Boolean));
   if(state.explain[newWord]){
@@ -295,6 +347,10 @@ watch(()=>route.query, (val)=>{
 
 onMounted(() => {
   window.addEventListener('keydown', handleKeyPress);
+  studyStart = Date.now();
+  studyTimer = window.setInterval(flushStudyTime, 15000);
+  document.addEventListener('visibilitychange', handleStudyVisibility);
+  window.addEventListener('beforeunload', flushStudyTime);
   state.current = route.query.index||localStorage.getItem('current_index') || 0;
   audioManager.preloadLettersForWords(upcomingWords.value);
   const wordSkills = localStorage.getItem('word_skills');
@@ -336,6 +392,12 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyPress);
+  flushStudyTime();
+  if (studyTimer) {
+    window.clearInterval(studyTimer);
+  }
+  document.removeEventListener('visibilitychange', handleStudyVisibility);
+  window.removeEventListener('beforeunload', flushStudyTime);
 });
 
 </script>
@@ -357,10 +419,14 @@ onUnmounted(() => {
           <el-option label="10000+" value="all"></el-option>
           <el-option label="自定义词汇" value="custom"></el-option>
         </el-select>
-        <el-link :underline="false" href="https://lixunchang.github.io/cet4-word-game/#/search" target="_blank">模糊搜索</el-link>
+        <el-link :underline="false" @click="router.push('/search')">模糊搜索</el-link>
+        <el-link :underline="false" @click="router.push('/profile')">个人中心</el-link>
       </span>
       <span class="header-right">
         <span class="steps">{{state.current}} / {{state.list.length}}</span>
+        <el-button class="hard-button" size="small" @click="toggleHard">
+          {{ isHard ? '★ 重难' : '☆ 重难' }}
+        </el-button>
         <el-switch
           v-model="state.reviewType"
           class="review-type"
@@ -489,6 +555,14 @@ onUnmounted(() => {
       .header-left{
         display: flex;
         align-items: center;
+        .el-link{
+          margin-right: 12px;
+          color: #444;
+          font-size: 13px;
+          &:hover{
+            color: #999;
+          }
+        }
         .search-icon{
           font-size: 16px;
           color: #fff;
@@ -527,6 +601,16 @@ onUnmounted(() => {
       .header-right{
         display: flex;
         align-items: center;
+        .hard-button{
+          margin-right: 8px;
+          color: #444;
+          background: transparent;
+          border: none;
+          &:hover{
+            color: #999;
+            background: transparent;
+          }
+        }
         .help-button{
           color: #444;
           background: transparent;
