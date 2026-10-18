@@ -622,24 +622,24 @@ onUnmounted(() => {
           }
         }
         .help-icon-button{
-          width: 28px;
-          height: 28px;
+          width: 16px;
+          height: 16px;
           padding: 0;
-          margin-left: 8px;
-          border: 1px solid #777;
+          margin-left: 6px;
+          border: 1px solid #555;
           border-radius: 50%;
           background: transparent;
-          color: #b9b9b9;
+          color: #888;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          font-size: 15px;
+          font-size: 10px;
           font-weight: 700;
           line-height: 1;
           cursor: pointer;
           &:hover{
-            color: #fff;
-            border-color: #bbb;
+            color: #ccc;
+            border-color: #888;
             background: rgba(255, 255, 255, 0.08);
           }
         }
@@ -806,10 +806,10 @@ onUnmounted(() => {
           margin: 0 6px;
         }
         .help-icon-button{
-          width: 26px;
-          height: 26px;
+          width: 16px;
+          height: 16px;
           margin-left: 4px;
-          font-size: 14px;
+          font-size: 10px;
         }
         .profile-link{
           margin-left: 6px;
