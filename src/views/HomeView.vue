@@ -68,6 +68,18 @@ const nextWord = computed(()=>{
   return state.list?.[state.current+1]?.split(' ')[0] || ''
 })
 
+const upcomingWords = computed(()=>{
+  const words = [currentWord.value]
+  const start = Number(state.current) || 0
+  for (let offset = 1; offset <= 2; offset++) {
+    const entry = state.list?.[start + offset]
+    if (entry) {
+      words.push(String(entry).split(' ')[0])
+    }
+  }
+  return Array.from(new Set(words.filter(Boolean)))
+})
+
 const currentSkill = computed({
         get() {
           console.log('get-value', state.skills, currentWord.value, state.current)
@@ -268,6 +280,12 @@ watch(nextWord, (newWord: string)=>{
   getWordExplain(newWord);
 }, { immediate: true })
 
+watch(upcomingWords, (words: string[])=>{
+  if(!words.length) return;
+  audioManager.preloadLettersForWords(words);
+  audioManager.preloadAllOnlineAudios(words);
+}, { immediate: true })
+
 watch(()=>route.query, (val)=>{
   if(Object.keys(val).length>0){
     location.reload()
@@ -276,9 +294,9 @@ watch(()=>route.query, (val)=>{
 
 
 onMounted(() => {
-  audioManager.preloadAllLetters()
   window.addEventListener('keydown', handleKeyPress);
   state.current = route.query.index||localStorage.getItem('current_index') || 0;
+  audioManager.preloadLettersForWords(upcomingWords.value);
   const wordSkills = localStorage.getItem('word_skills');
   if(wordSkills){
     state.skills = JSON.parse(wordSkills);

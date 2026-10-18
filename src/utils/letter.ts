@@ -10,7 +10,7 @@ const lettersAudio: Record<string, LetterAudioConfig> = Object.fromEntries(
   letters.map((letter) => [
     letter,
     {
-      url: `letters/${letter}.wav`,
+      url: `letters/${letter}.wav?v=3`,
       volume: 0.8,
     },
   ]),

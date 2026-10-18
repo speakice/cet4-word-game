@@ -114,6 +114,9 @@ class AudioManager {
 
   private letterAudios: Map<string, LetterAudio> = new Map();
   private letterAudioElements: Map<string, HTMLAudioElement> = new Map();
+  private letterBlobUrls: Map<string, string> = new Map();
+  private letterPreloadPromises: Map<string, Promise<string>> = new Map();
+  private allLettersPreloadPromise: Promise<boolean> | null = null;
   private onlineAudios: Map<string, OnlineAudio> = new Map();
   private onlineAudioElements: Map<string, HTMLAudioElement> = new Map();
   private activeLetterAudios: Set<HTMLAudioElement> = new Set();
@@ -296,17 +299,21 @@ class AudioManager {
     };
   }
 
-  // 预加载所有字母音频
-  async preloadAllLetters(
+  // 预加载所有字母音频，直到 26 个字母全部缓存完成
+  preloadAllLetters(
     onProgress: ProgressCallback | null = null,
   ): Promise<boolean> {
+    if (this.allLettersPreloadPromise) {
+      return this.allLettersPreloadPromise;
+    }
+
     const letters = 'abcdefghijklmnopqrstuvwxyz'.split('');
     let loadedCount = 0;
 
-    await Promise.all(
+    this.allLettersPreloadPromise = Promise.all(
       letters.map(async (letter) => {
         try {
-          await this.preloadLetter(letter);
+          await this.preloadLetterAsset(letter);
         } catch (error) {
           console.error(`预加载字母 ${letter} 失败:`, error);
         } finally {
@@ -316,14 +323,93 @@ class AudioManager {
           }
         }
       }),
-    );
+    ).then(() => true);
 
-    return true;
+    return this.allLettersPreloadPromise;
+  }
+
+  // 优先缓存即将学习单词里的字母，再后台补齐全部 26 个字母
+  async preloadLettersForWords(words: string[]): Promise<void> {
+    const letters = new Set<string>();
+    for (const word of words) {
+      for (const char of word.toLowerCase()) {
+        if (char >= 'a' && char <= 'z') {
+          letters.add(char);
+        }
+      }
+    }
+
+    await this.preloadLetterAssets(Array.from(letters));
+    void this.preloadAllLetters();
+  }
+
+  private async preloadLetterAssets(letters: string[]): Promise<void> {
+    const queue = Array.from(new Set(letters));
+    const workerCount = Math.min(4, queue.length);
+
+    await Promise.all(
+      Array.from({ length: workerCount }, async () => {
+        while (queue.length > 0) {
+          const letter = queue.shift();
+          if (letter) {
+            await this.preloadLetterAsset(letter);
+          }
+        }
+      }),
+    );
+  }
+
+  // 通过 fetch 把音频完整下载成 Blob，播放时不再依赖网络
+  private preloadLetterAsset(letter: string): Promise<string> {
+    const key = letter.toLowerCase();
+    const cachedBlobUrl = this.letterBlobUrls.get(key);
+    if (cachedBlobUrl) {
+      return Promise.resolve(cachedBlobUrl);
+    }
+
+    const pending = this.letterPreloadPromises.get(key);
+    if (pending) {
+      return pending;
+    }
+
+    const config = letterConfig[key];
+    const url = this.resolveAssetUrl(config?.url || `letters/${key}.wav`);
+    const promise = fetch(url, { cache: 'force-cache' })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return response.blob();
+      })
+      .then((blob) => {
+        const blobUrl = URL.createObjectURL(blob);
+        this.letterBlobUrls.set(key, blobUrl);
+
+        const audio = new Audio(blobUrl);
+        audio.preload = 'auto';
+        audio.volume = clamp((config?.volume ?? 0.8) * this.letterVolume);
+        audio.load();
+        this.letterAudioElements.set(key, audio);
+
+        return blobUrl;
+      })
+      .catch((error) => {
+        console.warn(`预加载字母 ${key} 音频失败，播放时回退网络:`, error);
+        return url;
+      })
+      .finally(() => {
+        this.letterPreloadPromises.delete(key);
+      });
+
+    this.letterPreloadPromises.set(key, promise);
+    return promise;
   }
 
   // 预加载单个字母音频
   preloadLetter(letter: string): Promise<LetterAudio> {
     const key = letter.toLowerCase();
+    void this.preloadLetterAsset(key);
+
     const cached = this.letterAudios.get(key);
     if (cached) {
       return Promise.resolve(cached);
@@ -338,13 +424,6 @@ class AudioManager {
     };
 
     this.letterAudios.set(key, letterAudio);
-
-    // 创建 Audio 对象触发浏览器下载并缓存音频
-    const audio = new Audio(src);
-    audio.preload = 'auto';
-    audio.volume = clamp((config?.volume ?? 0.8) * this.letterVolume);
-    audio.load();
-    this.letterAudioElements.set(key, audio);
 
     // 提前准备好 TTS 语音列表，作为本地音频失败时的兜底
     void this.loadVoices();
@@ -368,8 +447,15 @@ class AudioManager {
     this.stopOnlineAudio();
     this.stopAllLetters();
 
-    // 使用预加载过的同一个地址，命中浏览器缓存；每次新建 Audio 以支持连续按键
-    const src = this.letterAudioElements.get(key)?.src ?? this.resolveAssetUrl(config.url);
+    // 优先使用已经下载到内存的 Blob，按键时不再等待网络
+    const cachedBlobUrl = this.letterBlobUrls.get(key);
+    if (!cachedBlobUrl) {
+      void this.preloadLetterAsset(key);
+    }
+    const src =
+      cachedBlobUrl ??
+      this.letterAudioElements.get(key)?.src ??
+      this.resolveAssetUrl(config.url);
     const audio = new Audio(src);
     const targetVolume = clamp((volume ?? config.volume) * this.letterVolume);
     audio.volume = targetVolume;
