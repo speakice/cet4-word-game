@@ -16,18 +16,23 @@ import {
   type WordProgress,
 } from '@/utils/study';
 
+type WordTab = 'all' | 'learned' | 'hard' | 'unlearned';
+
 const router = useRouter();
 const daily = ref<Record<string, DailyStudy>>({});
 const progress = ref<Record<string, WordProgress>>({});
 const examRecords = ref<ExamRecord[]>([]);
 
-const activeTab = ref<'all' | 'learned' | 'hard' | 'unlearned'>('all');
+const activeTab = ref<WordTab>('all');
 const searchText = ref('');
 const currentPage = ref(1);
 const pageSize = 50;
 
 const recordDialogVisible = ref(false);
 const selectedRecord = ref<ExamRecord | null>(null);
+const heatmapPanelRef = ref<HTMLElement | null>(null);
+const examPanelRef = ref<HTMLElement | null>(null);
+const vocabPanelRef = ref<HTMLElement | null>(null);
 
 const allWordList = computed(() =>
   Array.from(new Set(allWords.etc4.filter(Boolean))),
@@ -125,6 +130,16 @@ function goPractice(word: string): void {
   router.push({ path: '/', query: { word } });
 }
 
+function scrollToPanel(element: HTMLElement | null): void {
+  element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function openWordTab(tab: WordTab): void {
+  activeTab.value = tab;
+  currentPage.value = 1;
+  requestAnimationFrame(() => scrollToPanel(vocabPanelRef.value));
+}
+
 function startExam(type: 'monthly' | 'pre-exam'): void {
   router.push({ path: '/exam', query: { type } });
 }
@@ -176,50 +191,101 @@ onMounted(() => {
       </header>
 
       <section class="stats-grid">
-        <div class="stat-card">
+        <div class="stat-card clickable" @click="scrollToPanel(heatmapPanelRef)">
           <span class="stat-label">累计学习</span>
           <strong>{{ formatDuration(totalSeconds) }}</strong>
           <span class="stat-hint">今天 {{ totalWordsToday }} 个单词</span>
         </div>
-        <div class="stat-card">
+        <div class="stat-card clickable" @click="openWordTab('all')">
           <span class="stat-label">总词汇</span>
           <strong>{{ tabCounts.all }}</strong>
           <span class="stat-hint">四级词汇表</span>
         </div>
-        <div class="stat-card">
+        <div class="stat-card clickable" @click="openWordTab('learned')">
           <span class="stat-label">已学</span>
           <strong>{{ tabCounts.learned }}</strong>
           <span class="stat-hint">完成过拼写</span>
         </div>
-        <div class="stat-card">
+        <div class="stat-card clickable" @click="openWordTab('hard')">
           <span class="stat-label">重难收藏</span>
           <strong>{{ tabCounts.hard }}</strong>
           <span class="stat-hint">手动标记</span>
         </div>
-        <div class="stat-card">
+        <div class="stat-card clickable" @click="openWordTab('unlearned')">
           <span class="stat-label">未学</span>
           <strong>{{ tabCounts.unlearned }}</strong>
           <span class="stat-hint">待开始</span>
         </div>
-        <div class="stat-card">
+        <div class="stat-card clickable" @click="scrollToPanel(examPanelRef)">
           <span class="stat-label">考试</span>
           <strong>{{ examRecords.length }} 次</strong>
           <span class="stat-hint">平均 {{ averageScore }} 分</span>
         </div>
       </section>
 
-      <section class="panel heatmap-panel">
+      <section ref="heatmapPanelRef" class="panel heatmap-panel">
         <div class="panel-title">
           <div>
             <h2>学习时长热力图</h2>
-            <p>最近 26 周 · 每格一天 · 颜色越深表示练得越久</p>
+            <p>最近一年 · 每格一天 · 颜色越深表示练得越久</p>
           </div>
           <span class="panel-total">{{ formatDuration(totalSeconds) }}</span>
         </div>
         <StudyHeatmap :data="daily" />
       </section>
 
-      <section class="panel vocabulary-panel">
+      <section ref="examPanelRef" class="panel exam-panel">
+        <div class="panel-title">
+          <div>
+            <h2>考试入口</h2>
+            <p>考完自动记录分数和错题</p>
+          </div>
+        </div>
+        <div class="exam-grid">
+          <div class="exam-card">
+            <span class="exam-kicker">MONTHLY</span>
+            <h3>月考</h3>
+            <p>最近一个月学习内容，随机 10 个单词。</p>
+            <span class="exam-hint">最近一月练习 {{ recentWords.length }} 词</span>
+            <el-button type="primary" @click="startExam('monthly')">开始月考</el-button>
+          </div>
+          <div class="exam-card pre-exam">
+            <span class="exam-kicker">PRE-EXAM</span>
+            <h3>考前测验</h3>
+            <p>优先抽取重难、错题和较长单词，共 100 题。</p>
+            <span class="exam-hint">重难收藏 {{ tabCounts.hard }} 词</span>
+            <el-button type="danger" plain @click="startExam('pre-exam')">开始测验</el-button>
+          </div>
+        </div>
+
+        <div class="records-header">
+          <h3>考试记录</h3>
+          <span>{{ examRecords.length }} 次</span>
+        </div>
+        <el-empty v-if="examRecords.length === 0" description="还没有考试记录" />
+        <div v-else class="record-list">
+          <div
+            v-for="record in examRecords"
+            :key="record.id"
+            class="record-row"
+            @click="openRecord(record)"
+          >
+            <div class="record-main">
+              <el-tag :type="record.type === 'monthly' ? 'primary' : 'danger'" size="small">
+                {{ examTypeLabel(record.type) }}
+              </el-tag>
+              <span>{{ formatDate(record.finishedAt) }}</span>
+              <span class="record-duration">{{ formatDuration(record.durationSeconds) }}</span>
+            </div>
+            <div class="record-score">
+              <strong>{{ record.score }}</strong>
+              <span>分 · {{ record.correct }}/{{ record.total }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section ref="vocabPanelRef" class="panel vocabulary-panel">
         <div class="panel-title">
           <div>
             <h2>词汇列表</h2>
@@ -276,56 +342,6 @@ onMounted(() => {
         </div>
       </section>
 
-      <section class="panel exam-panel">
-        <div class="panel-title">
-          <div>
-            <h2>考试入口</h2>
-            <p>考完自动记录分数和错题</p>
-          </div>
-        </div>
-        <div class="exam-grid">
-          <div class="exam-card">
-            <span class="exam-kicker">MONTHLY</span>
-            <h3>月考</h3>
-            <p>最近一个月学习内容，随机 10 个单词。</p>
-            <span class="exam-hint">最近一月练习 {{ recentWords.length }} 词</span>
-            <el-button type="primary" @click="startExam('monthly')">开始月考</el-button>
-          </div>
-          <div class="exam-card pre-exam">
-            <span class="exam-kicker">PRE-EXAM</span>
-            <h3>考前测验</h3>
-            <p>优先抽取重难、错题和较长单词，共 100 题。</p>
-            <span class="exam-hint">重难收藏 {{ tabCounts.hard }} 词</span>
-            <el-button type="danger" plain @click="startExam('pre-exam')">开始测验</el-button>
-          </div>
-        </div>
-
-        <div class="records-header">
-          <h3>考试记录</h3>
-          <span>{{ examRecords.length }} 次</span>
-        </div>
-        <el-empty v-if="examRecords.length === 0" description="还没有考试记录" />
-        <div v-else class="record-list">
-          <div
-            v-for="record in examRecords"
-            :key="record.id"
-            class="record-row"
-            @click="openRecord(record)"
-          >
-            <div class="record-main">
-              <el-tag :type="record.type === 'monthly' ? 'primary' : 'danger'" size="small">
-                {{ examTypeLabel(record.type) }}
-              </el-tag>
-              <span>{{ formatDate(record.finishedAt) }}</span>
-              <span class="record-duration">{{ formatDuration(record.durationSeconds) }}</span>
-            </div>
-            <div class="record-score">
-              <strong>{{ record.score }}</strong>
-              <span>分 · {{ record.correct }}/{{ record.total }}</span>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
 
     <el-dialog v-model="recordDialogVisible" title="考试详情" width="min(780px, 92vw)">
@@ -370,7 +386,8 @@ onMounted(() => {
 }
 
 .profile-inner {
-  max-width: 1120px;
+  max-width: 1400px;
+  width: 100%;
   margin: 0 auto;
 }
 
@@ -416,6 +433,18 @@ onMounted(() => {
   strong {
     font-size: 20px;
     color: #303133;
+  }
+}
+
+.stat-card.clickable {
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
   }
 }
 
